@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>PromptForge — AI Prompt Optimizer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a0f;
+  --surface:#111118;
+  --surface2:#1a1a24;
+  --border:#2a2a3a;
+  --border2:#3a3a50;
+  --text:#e8e8f0;
+  --muted:#8888aa;
+  --accent:#7c6dfa;
+  --accent2:#a78bfa;
+  --green:#22d3a0;
+  --amber:#f59e0b;
+  --red:#f87171;
+  --blue:#60a5fa;
+  --font-head:'Syne',sans-serif;
+  --font-mono:'JetBrains Mono',monospace;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--font-mono);min-height:100vh;overflow-x:hidden}
+
+/* grain overlay */
+body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");pointer-events:none;z-index:0;opacity:.4}
+
+.wrap{position:relative;z-index:1;max-width:820px;margin:0 auto;padding:2rem 1.5rem 4rem}
+
+/* header */
+header{text-align:center;padding:3rem 0 2.5rem}
+.logo{font-family:var(--font-head);font-size:2.6rem;font-weight:800;letter-spacing:-1px;background:linear-gradient(135deg,#a78bfa,#7c6dfa,#60a5fa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.tagline{font-size:.75rem;color:var(--muted);letter-spacing:.2em;text-transform:uppercase;margin-top:.5rem}
+.badge-row{display:flex;gap:.5rem;justify-content:center;margin-top:1.2rem;flex-wrap:wrap}
+.badge{font-size:.65rem;padding:.2rem .7rem;border-radius:2px;border:1px solid var(--border2);color:var(--muted);letter-spacing:.1em;text-transform:uppercase}
+.badge.a{border-color:#7c6dfa44;color:var(--accent2)}
+
+/* input section */
+.input-card{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:1.5rem;margin-bottom:1.5rem}
+.section-label{font-size:.65rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem}
+textarea{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:2px;color:var(--text);font-family:var(--font-mono);font-size:.85rem;padding:1rem;resize:vertical;min-height:130px;line-height:1.6;transition:border-color .2s}
+textarea:focus{outline:none;border-color:var(--accent)}
+textarea::placeholder{color:var(--muted)}
+.btn-row{display:flex;gap:.75rem;margin-top:1rem;align-items:center}
+button.primary{background:var(--accent);color:#fff;border:none;border-radius:2px;padding:.65rem 1.6rem;font-family:var(--font-mono);font-size:.8rem;font-weight:500;cursor:pointer;letter-spacing:.05em;transition:opacity .2s,transform .1s}
+button.primary:hover{opacity:.88}
+button.primary:active{transform:scale(.98)}
+button.primary:disabled{opacity:.4;cursor:not-allowed}
+button.ghost{background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:2px;padding:.65rem 1rem;font-family:var(--font-mono);font-size:.8rem;cursor:pointer;transition:border-color .2s,color .2s}
+button.ghost:hover{border-color:var(--border2);color:var(--text)}
+.char-count{font-size:.7rem;color:var(--muted);margin-left:auto}
+
+/* loading */
+.loading{display:none;align-items:center;gap:.75rem;padding:1.5rem;color:var(--muted);font-size:.8rem}
+.loading.show{display:flex}
+.spinner{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-text{color:var(--muted)}
+
+/* results */
+#results{display:none}
+#results.show{display:block;animation:fadeUp .4s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+
+/* verdict bar */
+.verdict-bar{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:1.25rem 1.5rem;margin-bottom:1rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap}
+.overall-score{font-family:var(--font-head);font-size:2.8rem;font-weight:800;line-height:1;flex-shrink:0}
+.score-good{color:var(--green)}
+.score-mid{color:var(--amber)}
+.score-bad{color:var(--red)}
+.verdict-text{flex:1;min-width:180px}
+.verdict-label{font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:.3rem}
+.verdict-msg{font-size:.85rem;color:var(--text);line-height:1.5}
+
+/* score grid */
+.score-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.75rem;margin-bottom:1rem}
+.score-card{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:1rem}
+.sc-label{font-size:.6rem;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-bottom:.5rem}
+.sc-val{font-family:var(--font-head);font-size:1.6rem;font-weight:700;margin-bottom:.3rem}
+.sc-reason{font-size:.7rem;color:var(--muted);line-height:1.4}
+.sc-bar{height:2px;background:var(--border);border-radius:1px;margin-top:.6rem}
+.sc-fill{height:100%;border-radius:1px;transition:width .6s ease}
+
+/* issues */
+.issues-card{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:1.25rem 1.5rem;margin-bottom:1rem}
+.issue-item{display:flex;align-items:flex-start;gap:.6rem;padding:.5rem 0;border-bottom:1px solid var(--border);font-size:.8rem;color:var(--muted);line-height:1.5}
+.issue-item:last-child{border-bottom:none;padding-bottom:0}
+.issue-dot{width:5px;height:5px;border-radius:50%;background:var(--red);flex-shrink:0;margin-top:.45rem}
+
+/* rewrites */
+.rewrites-grid{display:grid;gap:.75rem;margin-bottom:1rem}
+.rewrite-card{background:var(--surface);border:1px solid var(--border);border-radius:4px;overflow:hidden}
+.rewrite-head{display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;border-bottom:1px solid var(--border);gap:.5rem}
+.rewrite-tier{font-size:.65rem;letter-spacing:.15em;text-transform:uppercase;font-weight:600}
+.tier-minimal{color:var(--blue)}
+.tier-structured{color:var(--green)}
+.tier-expert{color:var(--accent2)}
+.rewrite-change{font-size:.7rem;color:var(--muted);text-align:right;flex:1}
+.rewrite-body{padding:1rem;font-size:.8rem;line-height:1.7;color:var(--text);white-space:pre-wrap;word-break:break-word}
+.copy-btn{background:transparent;border:1px solid var(--border);border-radius:2px;color:var(--muted);font-family:var(--font-mono);font-size:.65rem;padding:.25rem .6rem;cursor:pointer;transition:border-color .2s,color .2s;flex-shrink:0}
+.copy-btn:hover{border-color:var(--accent);color:var(--accent)}
+.copy-btn.copied{color:var(--green);border-color:var(--green)}
+
+/* compare section */
+.compare-section{margin-top:.75rem}
+.compare-btn-wrap{text-align:center;margin-bottom:1rem}
+.compare-select{background:var(--surface2);border:1px solid var(--border);border-radius:2px;color:var(--text);font-family:var(--font-mono);font-size:.8rem;padding:.5rem .8rem;cursor:pointer;margin-right:.5rem}
+.compare-select:focus{outline:none;border-color:var(--accent)}
+.compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
+@media(max-width:600px){.compare-grid{grid-template-columns:1fr}}
+.compare-panel{background:var(--surface);border:1px solid var(--border);border-radius:4px;overflow:hidden}
+.compare-head{padding:.6rem 1rem;border-bottom:1px solid var(--border);font-size:.65rem;letter-spacing:.15em;text-transform:uppercase}
+.original-head{color:var(--red)}
+.rewritten-head{color:var(--green)}
+.compare-body{padding:1rem;font-size:.78rem;line-height:1.7;color:var(--text);white-space:pre-wrap;min-height:120px;word-break:break-word}
+
+/* divider */
+.divider{border:none;border-top:1px solid var(--border);margin:1.5rem 0}
+.section-title{font-size:.65rem;letter-spacing:.25em;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem}
+
+/* footer */
+footer{text-align:center;padding-top:3rem;font-size:.65rem;color:var(--muted);letter-spacing:.1em}
+footer a{color:var(--accent2);text-decoration:none}
+
+/* examples */
+.examples{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.75rem}
+.example-pill{background:var(--surface2);border:1px solid var(--border);border-radius:2px;padding:.3rem .8rem;font-size:.7rem;color:var(--muted);cursor:pointer;transition:border-color .2s,color .2s;line-height:1.4}
+.example-pill:hover{border-color:var(--accent);color:var(--accent2)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="logo">PromptForge</div>
+  <div class="tagline">AI Prompt Optimizer &amp; Analyzer</div>
+  <div class="badge-row">
+    <span class="badge a">Llama 3.3 70B</span>
+    <span class="badge">5-dimension scoring</span>
+    <span class="badge">3 rewrites</span>
+    <span class="badge">live comparison</span>
+  </div>
+</header>
+
+<div class="input-card">
+  <div class="section-label">Your prompt</div>
+  <textarea id="promptInput" placeholder="Paste your prompt here... e.g. 'write me a python function'"></textarea>
+  <div class="examples">
+    <span class="example-pill" onclick="setExample(0)">write me a python function</span>
+    <span class="example-pill" onclick="setExample(1)">summarize this article</span>
+    <span class="example-pill" onclick="setExample(2)">make a website for my shop</span>
+    <span class="example-pill" onclick="setExample(3)">explain machine learning</span>
+  </div>
+  <div class="btn-row">
+    <button class="primary" id="analyzeBtn" onclick="analyze()">Analyze Prompt →</button>
+    <button class="ghost" onclick="clearAll()">Clear</button>
+    <span class="char-count" id="charCount">0 chars</span>
+  </div>
+</div>
+
+<div class="loading" id="loading">
+  <div class="spinner"></div>
+  <span class="loading-text" id="loadingText">Analyzing your prompt...</span>
+</div>
+
+<div id="results">
+
+  <div class="verdict-bar">
+    <div class="overall-score" id="overallScore">—</div>
+    <div class="verdict-text">
+      <div class="verdict-label">Verdict</div>
+      <div class="verdict-msg" id="verdictMsg">—</div>
+    </div>
+  </div>
+
+  <div class="section-title">Dimension Scores</div>
+  <div class="score-grid" id="scoreGrid"></div>
+
+  <hr class="divider"/>
+
+  <div class="section-title">Top Issues</div>
+  <div class="issues-card" id="issuesList"></div>
+
+  <hr class="divider"/>
+
+  <div class="section-title">Rewrites</div>
+  <div class="rewrites-grid" id="rewritesGrid"></div>
+
+  <hr class="divider"/>
+
+  <div class="section-title">Live Comparison</div>
+  <div class="compare-section">
+    <div class="compare-btn-wrap">
+      <select class="compare-select" id="compareSelect">
+        <option value="minimal">Minimal rewrite</option>
+        <option value="structured">Structured rewrite</option>
+        <option value="expert">Expert rewrite</option>
+      </select>
+      <button class="primary" id="compareBtn" onclick="compare()">Run Comparison →</button>
+    </div>
+    <div class="compare-grid">
+      <div class="compare-panel">
+        <div class="compare-head original-head">Original Output</div>
+        <div class="compare-body" id="origOutput">Run comparison to see output...</div>
+      </div>
+      <div class="compare-panel">
+        <div class="compare-head rewritten-head">Rewritten Output</div>
+        <div class="compare-body" id="rewriteOutput">Run comparison to see output...</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  Built by <a href="https://github.com/malankatharula" target="_blank">malankatharula</a> &nbsp;·&nbsp;
+  Powered by Groq + Llama 3.3 70B
+</footer>
+
+</div>
+
+<script>
+const API = 'http://localhost:8001';
+
+const EXAMPLES = [
+  'write me a python function',
+  'summarize this article',
+  'make a website for my shop',
+  'explain machine learning'
+];
+
+let currentData = null;
+
+const promptInput = document.getElementById('promptInput');
+const charCount = document.getElementById('charCount');
+
+promptInput.addEventListener('input', () => {
+  charCount.textContent = promptInput.value.length + ' chars';
+});
+
+function setExample(i) {
+  promptInput.value = EXAMPLES[i];
+  charCount.textContent = EXAMPLES[i].length + ' chars';
+}
+
+function clearAll() {
+  promptInput.value = '';
+  charCount.textContent = '0 chars';
+  document.getElementById('results').classList.remove('show');
+  document.getElementById('results').style.display = 'none';
+  currentData = null;
+}
+
+function scoreColor(s) {
+  if (s >= 7) return 'var(--green)';
+  if (s >= 4) return 'var(--amber)';
+  return 'var(--red)';
+}
+
+function overallClass(s) {
+  if (s >= 7) return 'score-good';
+  if (s >= 4) return 'score-mid';
+  return 'score-bad';
+}
+
+function dimLabel(k) {
+  return {
+    clarity: 'Clarity',
+    specificity: 'Specificity',
+    context: 'Context',
+    instruction_quality: 'Instructions',
+    output_format: 'Output Format'
+  }[k] || k;
+}
+
+async function analyze() {
+  const prompt = promptInput.value.trim();
+  if (!prompt) { promptInput.focus(); return; }
+
+  const btn = document.getElementById('analyzeBtn');
+  const loading = document.getElementById('loading');
+  const results = document.getElementById('results');
+  const loadingText = document.getElementById('loadingText');
+
+  btn.disabled = true;
+  results.classList.remove('show');
+  results.style.display = 'none';
+  loading.classList.add('show');
+
+  const msgs = ['Analyzing your prompt...', 'Scoring dimensions...', 'Crafting rewrites...', 'Almost done...'];
+  let mi = 0;
+  const interval = setInterval(() => { mi = (mi+1)%msgs.length; loadingText.textContent = msgs[mi]; }, 1800);
+
+  try {
+    const res = await fetch(API + '/analyze', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({prompt})
+    });
+    if (!res.ok) throw new Error('API error ' + res.status);
+    const data = await res.json();
+    currentData = data;
+    currentData._original = prompt;
+    renderResults(data);
+  } catch(e) {
+    alert('Error: ' + e.message + '\n\nMake sure the backend is running.');
+  } finally {
+    clearInterval(interval);
+    loading.classList.remove('show');
+    btn.disabled = false;
+  }
+}
+
+function renderResults(data) {
+  // overall
+  const ov = document.getElementById('overallScore');
+  ov.textContent = data.overall + '/10';
+  ov.className = 'overall-score ' + overallClass(data.overall);
+  document.getElementById('verdictMsg').textContent = data.verdict;
+
+  // score grid
+  const grid = document.getElementById('scoreGrid');
+  grid.innerHTML = '';
+  Object.entries(data.scores).forEach(([k,v]) => {
+    const pct = (v.score/10)*100;
+    grid.innerHTML += `
+      <div class="score-card">
+        <div class="sc-label">${dimLabel(k)}</div>
+        <div class="sc-val" style="color:${scoreColor(v.score)}">${v.score}<span style="font-size:.9rem;color:var(--muted)">/10</span></div>
+        <div class="sc-reason">${v.reason}</div>
+        <div class="sc-bar"><div class="sc-fill" style="width:${pct}%;background:${scoreColor(v.score)}"></div></div>
+      </div>`;
+  });
+
+  // issues
+  const issues = document.getElementById('issuesList');
+  issues.innerHTML = data.top_issues.map(i =>
+    `<div class="issue-item"><div class="issue-dot"></div><span>${i}</span></div>`
+  ).join('');
+
+  // rewrites
+  const rg = document.getElementById('rewritesGrid');
+  rg.innerHTML = '';
+  const tiers = ['minimal','structured','expert'];
+  const tierClass = {minimal:'tier-minimal',structured:'tier-structured',expert:'tier-expert'};
+  tiers.forEach(t => {
+    const rw = data.rewrites[t];
+    rg.innerHTML += `
+      <div class="rewrite-card">
+        <div class="rewrite-head">
+          <span class="rewrite-tier ${tierClass[t]}">${t}</span>
+          <span class="rewrite-change">${rw.what_changed}</span>
+          <button class="copy-btn" onclick="copyText(this,'${t}')">copy</button>
+        </div>
+        <div class="rewrite-body" id="rw-${t}">${escHtml(rw.prompt)}</div>
+      </div>`;
+  });
+
+  // reset compare
+  document.getElementById('origOutput').textContent = 'Run comparison to see output...';
+  document.getElementById('rewriteOutput').textContent = 'Run comparison to see output...';
+
+  const results = document.getElementById('results');
+  results.style.display = 'block';
+  setTimeout(() => results.classList.add('show'), 10);
+  results.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function copyText(btn, tier) {
+  if (!currentData) return;
+  const text = currentData.rewrites[tier].prompt;
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'copy'; btn.classList.remove('copied'); }, 1800);
+  });
+}
+
+async function compare() {
+  if (!currentData) return;
+  const tier = document.getElementById('compareSelect').value;
+  const rewritten = currentData.rewrites[tier].prompt;
+  const original = currentData._original;
+
+  const btn = document.getElementById('compareBtn');
+  btn.disabled = true;
+  btn.textContent = 'Running...';
+
+  document.getElementById('origOutput').textContent = 'Generating...';
+  document.getElementById('rewriteOutput').textContent = 'Generating...';
+
+  try {
+    const res = await fetch(API + '/compare', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({original, rewritten})
+    });
+    if (!res.ok) throw new Error('API error ' + res.status);
+    const data = await res.json();
+    document.getElementById('origOutput').textContent = data.original_output;
+    document.getElementById('rewriteOutput').textContent = data.rewritten_output;
+  } catch(e) {
+    document.getElementById('origOutput').textContent = 'Error: ' + e.message;
+    document.getElementById('rewriteOutput').textContent = 'Error: ' + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Run Comparison →';
+  }
+}
+</script>
+</body>
+</html>
